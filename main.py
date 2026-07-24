@@ -5,7 +5,10 @@ import numpy             as np
 import pandas            as pd
 import matplotlib.pyplot as plt
 import kagglehub
-from   PIL import Image
+from   PIL                     import Image
+from   sklearn.model_selection import train_test_split
+from   sklearn.preprocessing   import StandardScaler
+from   sklearn.decomposition   import PCA
 
 # TODO: switch out PIL for something else
 
@@ -13,6 +16,12 @@ PENUMONIA = kagglehub.dataset_download("iamtapendu/rsna-pneumonia-processed-data
 PENUMONIA_TRAIN_CSV    = PENUMONIA + "/stage2_train_metadata.csv"
 PNEUMONIA_TRAIN_IMAGES = PENUMONIA + "/Training/Images"
 PNEUMONIA_TRAIN_MASKS  = PENUMONIA + "/Training/Masks"
+
+IMAGE_COUNT = 1000
+IMAGE_SIZE  = (500, 500)
+
+PCA_DIMENTION_FACT = 0.1
+REDUCED_DIMENTION  = round(IMAGE_COUNT * PCA_DIMENTION_FACT)
 
 train_metadata = pd.read_csv(PENUMONIA_TRAIN_CSV)
 
@@ -37,21 +46,20 @@ for key in tuple(train_metadata)[0:]:
 
 print("\nNaNs:")
 NaNs = train_metadata.isnull().sum()
-print(NaNs[NaNs > 0])
+print(NaNs[NaNs > 0], end = "\n" * 2)
 
-train_y = tuple(train_metadata["Target"])[:100]
-train_y = np.array(
-    tuple(
-        map(
-            lambda out: [out],
-            train_y
-        )
-    )
-)
+dataset_y = np.array(tuple(map(lambda out: [out], train_metadata["Target"]))[:IMAGE_COUNT])
 
-def load_training_data(load_len: int, img_size: tuple[int, int]) -> np.array:
+def load_training_data(
+        load_len: int,
+        img_size: tuple[int, int],
+        reduced_dimention: int
+) -> np.array:
 
-    train_x = []
+    dataset_x = []
+    assert (load_len >= reduced_dimention)
+
+    print("Loading dataset from source...")
 
     for i, patient in train_metadata.iterrows():
 
@@ -60,15 +68,50 @@ def load_training_data(load_len: int, img_size: tuple[int, int]) -> np.array:
 
         img = Image.open(f"{PNEUMONIA_TRAIN_IMAGES}/{patient.patientId}.png")
         img = img.resize(img_size)
-        train_x.append(np.array(img).flatten())
 
-    return np.array(train_x)
+        dataset_x.append(np.array(img).flatten())
+
+    print("Done.\n")
+
+    print("Standardizing dataset...")
+    dataset_x = StandardScaler().fit_transform(dataset_x)
+    print("Done.\n")
+
+    print("Reducing datset dimensionality...")
+    dataset_x = PCA(n_components = REDUCED_DIMENTION).fit_transform(dataset_x)
+    print("Done.\n")
+
+    return np.array(dataset_x)
+
+class OutdatedCachedDataset(Exception):
+    pass
 
 try:
-    train_x = np.load(".cache/train_x.npy")
-except FileNotFoundError:
-    train_x = load_training_data(100, (200, 200))
-    np.save(".cache/train_x", train_x)
 
-print(train_x.shape)
-print(train_y.shape)
+    print("Loading dataset from cache...")
+    dataset_x = np.load(".cache/dataset_x.npy")
+    print("Done.\n")
+
+    if (
+        dataset_x.shape[0] != IMAGE_COUNT or
+        dataset_x.shape[1] != REDUCED_DIMENTION
+    ):
+        print("Loading dataset from source due to outdated cache.")
+        raise OutdatedCachedDataset
+
+except (FileNotFoundError, OutdatedCachedDataset):
+    dataset_x = load_training_data(
+        IMAGE_COUNT,
+        IMAGE_SIZE,
+        REDUCED_DIMENTION,
+    )
+    np.save(".cache/dataset_x", dataset_x)
+
+train_x, test_x, train_y, test_y = train_test_split(
+    dataset_x,
+    dataset_y,
+    train_size = 0.8,
+    stratify   = dataset_y
+)
+
+print(train_x.shape, train_y.shape)
