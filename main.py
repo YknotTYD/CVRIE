@@ -1,6 +1,7 @@
 ##main.py 
 
 import matplotlib
+import constants
 import numpy             as np
 import pandas            as pd
 import matplotlib.pyplot as plt
@@ -13,56 +14,24 @@ from   sklearn.preprocessing   import StandardScaler
 from   sklearn.decomposition   import PCA
 from   sklearn.linear_model    import LogisticRegression
 from   sklearn.ensemble        import RandomForestClassifier
-from sklearn.model_selection   import cross_val_score
+from   sklearn.model_selection import cross_val_score
 
 # TODO: switch out PIL for something else
 # TODO: a logger
 
-# V The dataset only contains images and their associated labels. You may trim additional information.
-# V The overall dataset is representative of a classification issue.
-# ? You are able to justify your choice.( Choosing the same dataset as another group without justification is forbidden.)
+#  V The dataset only contains images and their associated labels. You may trim additional information.
+#  V The overall dataset is representative of a classification issue.
+#  ? You are able to justify your choice.( Choosing the same dataset as another group without justification is forbidden.)
 
-# V Your data could need to be normalised. Images of different sizes, color palettes or resolution might need  some pre-processing.
-# V Your data could be unbalanced. Are positive and negative cases both present and equally represented in your data?
-# V (X) Are there outliers that skew the data in specific directions or extremes?
+#  V Your data could need to be normalised. Images of different sizes, color palettes or resolution might need  some pre-processing.
+#  V Your data could be unbalanced. Are positive and negative cases both present and equally represented in your data?
+#  V (X) Are there outliers that skew the data in specific directions or extremes?
 
-PENUMONIA = kagglehub.dataset_download("iamtapendu/rsna-pneumonia-processed-dataset")
-PENUMONIA_TRAIN_CSV    = PENUMONIA + "/stage2_train_metadata.csv"
-PNEUMONIA_TRAIN_IMAGES = PENUMONIA + "/Training/Images"
-PNEUMONIA_TRAIN_MASKS  = PENUMONIA + "/Training/Masks"
+# (V) How do you split training data from evaluation data?
+#  X Each time, your model should try to adapt itself to reduce the value of its loss function. This concept should be part of your notebook
 
-IMAGE_COUNT = 4000
-IMAGE_SIZE  = (400, 400)
-
-PCA_DIMENTION_FACT = 0.1
-REDUCED_DIMENTION  = round(IMAGE_COUNT * PCA_DIMENTION_FACT)
-
-train_metadata = pd.read_csv(PENUMONIA_TRAIN_CSV)
-
-for patient_id in train_metadata.get("patientId"):
-
-    for folder in (PNEUMONIA_TRAIN_IMAGES, PNEUMONIA_TRAIN_MASKS):
-
-        filepath = f"{folder}/{patient_id}.png"
-
-        try:
-            with open(filepath) as file:
-                pass
-        except FileNotFoundError:
-            print(f"File '{filepath}' not found.")
-            exit(1)
-
-print("Training data files present.")
-
-for key in tuple(train_metadata)[0:]:
-    print()
-    print(train_metadata[key].value_counts())
-
-print("\nNaNs:")
-NaNs = train_metadata.isnull().sum()
-print(NaNs[NaNs > 0], end = "\n" * 2)
-
-dataset_y = np.array(tuple(map(lambda out: out, train_metadata["Target"]))[:IMAGE_COUNT])
+train_metadata = pd.read_csv(constants.PENUMONIA_TRAIN_CSV)
+dataset_y = np.array(tuple(map(lambda out: out, train_metadata["Target"]))[:constants.IMAGE_COUNT])
 
 def load_training_data(
         load_len: int,
@@ -82,7 +51,7 @@ def load_training_data(
 
         dataset_x.append(
             np.array(
-                Image.open(f"{PNEUMONIA_TRAIN_IMAGES}/{patient.patientId}.png").convert("L").resize(img_size)
+                Image.open(f"{constants.PNEUMONIA_TRAIN_IMAGES}/{patient.patientId}.png").convert("L").resize(img_size)
             ).flatten()
         )
 
@@ -93,7 +62,7 @@ def load_training_data(
     print("Done.\n")
 
     print("Reducing dataset dimensionality...")
-    dataset_x = PCA(n_components = REDUCED_DIMENTION).fit_transform(dataset_x)
+    dataset_x = PCA(n_components = constants.REDUCED_DIMENTION).fit_transform(dataset_x)
     print("Done.\n")
 
     return np.array(dataset_x)
@@ -108,8 +77,8 @@ try:
     print("Done.\n")
 
     if (
-        dataset_x.shape[0] != IMAGE_COUNT or
-        dataset_x.shape[1] != REDUCED_DIMENTION
+        dataset_x.shape[0] != constants.IMAGE_COUNT or
+        dataset_x.shape[1] != constants.REDUCED_DIMENTION
     ):
         raise OutdatedCacheError("Loading dataset from source due to outdated cache.")
 
@@ -121,9 +90,9 @@ except (FileNotFoundError, OutdatedCacheError) as e:
         print(f"{e.strerror}: '{e.filename}'.")
 
     dataset_x = load_training_data(
-        IMAGE_COUNT,
-        IMAGE_SIZE,
-        REDUCED_DIMENTION,
+        constants.IMAGE_COUNT,
+        constants.IMAGE_SIZE,
+        constants.REDUCED_DIMENTION,
     )
 
     if not os.path.exists(".cache"):
@@ -136,7 +105,7 @@ except (FileNotFoundError, OutdatedCacheError) as e:
 train_x, test_x, train_y, test_y = train_test_split(
     dataset_x,
     dataset_y,
-    train_size = 0.8,
+    train_size = 0.99,
     stratify   = dataset_y
 )
 
@@ -173,8 +142,8 @@ def test_model(model_class, *args, **kwargs) -> tuple[float, float]:
 
     return (scores.mean(), scores.std(), model)
 
-best_mean  = {"value": None, "model": None}
-best_std   = {"value": None, "model": None}
+best_mean = {"value": None, "model": None}
+best_std  = {"value": None, "model": None}
 
 def save_best(mean, std, model) -> None:
 
