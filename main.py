@@ -1,13 +1,9 @@
-##main.py 
+## main.py 
 
-import matplotlib
 import constants
-import numpy             as np
-import pandas            as pd
-import matplotlib.pyplot as plt
-import kagglehub
-import os
-from   typing                  import Callable
+import numpy  as np
+import pandas as pd
+import DatasetLoader
 from   PIL                     import Image
 from   sklearn.model_selection import train_test_split
 from   sklearn.preprocessing   import StandardScaler
@@ -30,12 +26,10 @@ from   sklearn.model_selection import cross_val_score
 # (V) How do you split training data from evaluation data?
 #  X Each time, your model should try to adapt itself to reduce the value of its loss function. This concept should be part of your notebook
 
-train_metadata = pd.read_csv(constants.PENUMONIA_TRAIN_CSV)
-dataset_y = np.array(tuple(map(lambda out: out, train_metadata["Target"]))[:constants.IMAGE_COUNT])
-
 def load_training_data(
-        load_len: int,
-        img_size: tuple[int, int],
+        train_metadata:    pd.DataFrame,
+        load_len:          int,
+        img_size:          tuple[int, int],
         reduced_dimention: int
 ) -> np.array:
 
@@ -67,67 +61,14 @@ def load_training_data(
 
     return np.array(dataset_x)
 
-class OutdatedCacheError(Exception):
-    pass
-
-try:
-
-    print("Loading dataset from cache...")
-    dataset_x = np.load(".cache/dataset_x.npy")
-    print("Done.\n")
-
-    if (
-        dataset_x.shape[0] != constants.IMAGE_COUNT or
-        dataset_x.shape[1] != constants.REDUCED_DIMENTION
-    ):
-        raise OutdatedCacheError("Loading dataset from source due to outdated cache.")
-
-except (FileNotFoundError, OutdatedCacheError) as e:
-
-    if isinstance(e, OutdatedCacheError):
-        print(e)
-    else:
-        print(f"{e.strerror}: '{e.filename}'.")
-
-    dataset_x = load_training_data(
-        constants.IMAGE_COUNT,
-        constants.IMAGE_SIZE,
-        constants.REDUCED_DIMENTION,
-    )
-
-    if not os.path.exists(".cache"):
-        os.makedirs(".cache")
-
-    print("Saving dataset to '.cache/dataset_x.npy'...")
-    np.save(".cache/dataset_x", dataset_x)
-    print("Done.\n")
+dataset_x, dataset_y = DatasetLoader.load_or_build_cache(load_training_data)
 
 train_x, test_x, train_y, test_y = train_test_split(
     dataset_x,
     dataset_y,
-    train_size = 0.99,
+    train_size = 0.8,
     stratify   = dataset_y
 )
-
-print("Dataset successfully loaded.")
-
-def get_call_str(function_like: Callable, *args, **kwargs) -> str:
-
-    call_str = f"{function_like.__qualname__}("
-
-    if args:
-        call_str += "".join([str(arg) + ", " for arg in args])
-
-    if kwargs:
-        call_str += "".join(
-            [f"{key} = {value}, " for key, value in kwargs.items()]
-        )
-
-    if args or kwargs:
-        call_str = call_str[:-2]
-
-    call_str += ")"
-    return call_str
 
 def test_model(model_class, *args, **kwargs) -> tuple[float, float]:
 
@@ -142,27 +83,14 @@ def test_model(model_class, *args, **kwargs) -> tuple[float, float]:
 
     return (scores.mean(), scores.std(), model)
 
-best_mean = {"value": None, "model": None}
-best_std  = {"value": None, "model": None}
+print(test_model(RandomForestClassifier, n_estimators = 500, max_depth = 6))
 
-def save_best(mean, std, model) -> None:
-
-    global best_mean
-    global best_std
-
-    if  best_mean["value"] is None or mean > best_mean["value"]:
-        best_mean["value"] = mean
-        best_mean["model"] = model
-
-    if  best_std["value"] is None or std < best_std["value"]:
-        best_std["value"] = std
-        best_std["model"] = model
-
-    return None
+# best_mean = {"value": None, "model": None}
+# best_std  = {"value": None, "model": None}
 
 #for i in range(10):
 #    mean, std, model = test_model(LogisticRegression, max_iter = 1_000 + i * 500)
-#    save_best(mean, std, model)
+#    save_best(best_mean, best_std, mean, std, model)
 #    print()
 #    break
 
@@ -175,7 +103,5 @@ def save_best(mean, std, model) -> None:
 #            max_depth = depth
 #        )
 #
-#        save_best(mean, std, model)
+#        save_best(best_mean, best_std, mean, std, model)
 #        print()
-
-print(test_model(RandomForestClassifier, n_estimators = 500, max_depth = 6))
