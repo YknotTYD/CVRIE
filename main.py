@@ -85,23 +85,22 @@ def test_model(model_class, *args, **kwargs) -> tuple[float, float]:
 
 print(test_model(RandomForestClassifier, n_estimators = 500, max_depth = 6))
 
+# from helpers import save_best
+# 
 # best_mean = {"value": None, "model": None}
 # best_std  = {"value": None, "model": None}
-
-#for i in range(10):
-#    mean, std, model = test_model(LogisticRegression, max_iter = 1_000 + i * 500)
-#    save_best(best_mean, best_std, mean, std, model)
-#    print()
-#    break
-
-#for i in range(1, 11):
-#    for depth in list(range(1, 7)) + [None]:
-#
-#        mean, std, model = test_model(
-#            RandomForestClassifier,
-#            n_estimators = i * 50,
-#            max_depth = depth
-#        )
-#
-#        save_best(best_mean, best_std, mean, std, model)
-#        print()
+# 
+# for i in range(10):
+#     mean, std, model = test_model(LogisticRegression, max_iter = 1_000 + i * 500)
+#     save_best(best_mean, best_std, mean, std, model)
+#     print()
+#     break
+# for i in range(1, 11):
+#     for depth in list(range(1, 7)) + [None]: 
+#         mean, std, model = test_model(
+#             RandomForestClassifier,
+#             n_estimators = i * 50,
+#             max_depth = depth
+#         ) 
+#         save_best(best_mean, best_std, mean, std, model)
+#         print()
